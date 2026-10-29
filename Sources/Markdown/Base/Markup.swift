@@ -11,6 +11,10 @@
 /// Creates an element of a type that corresponds to the kind of markup data and casts back up to `Markup`.
 func makeMarkup(_ data: _MarkupData) -> Markup {
     switch data.raw.markup.data {
+    case .footnoteDefinition:
+        return FootnoteDefinition(data)
+    case .footnoteReference:
+        return FootnoteReference(data)
     case .blockQuote:
         return BlockQuote(data)
     case .codeBlock:

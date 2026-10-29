@@ -35,6 +35,12 @@ public protocol MarkupVisitor<Result> {
      */
     mutating func visit(_ markup: Markup) -> Result
 
+    /// Visit a preserved footnote definition.
+    mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) -> Result
+
+    /// Visit a raw-label footnote reference.
+    mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) -> Result
+
     /**
      Visit a `BlockQuote` element and return the result.
 
@@ -322,6 +328,12 @@ extension MarkupVisitor {
     // dispatches to the correct visit___ method.
     public mutating func visit(_ markup: Markup) -> Result {
         return markup.accept(&self)
+    }
+    public mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) -> Result {
+        return defaultVisit(footnoteDefinition)
+    }
+    public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) -> Result {
+        return defaultVisit(footnoteReference)
     }
     public mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> Result {
         return defaultVisit(blockQuote)

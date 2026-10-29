@@ -16,6 +16,12 @@ public struct ParseOptions: OptionSet, Sendable {
         self.rawValue = rawValue
     }
 
+    /// Preserve footnote definitions in source order and references with their raw labels.
+    ///
+    /// This opt-in syntax requires the companion cmark lossless-footnotes extension.
+    /// It does not assign display numbers or generate a rendered footer.
+    public static let parseFootnotes = ParseOptions(rawValue: 1 << 5)
+
     /// Enable block directive syntax.
     public static let parseBlockDirectives = ParseOptions(rawValue: 1 << 0)
 

@@ -707,6 +707,27 @@ public struct MarkupFormatter: MarkupWalker {
         }
     }
 
+    public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) {
+        print(footnoteReference.plainText, for: footnoteReference)
+    }
+
+    public mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) {
+        if footnoteDefinition.indexInParent > 0 {
+            ensurePrecedingNewlineCount(atLeast: 2)
+        }
+        // Format detached content, then indent continuation lines as footnote content.
+        // Outer container prefixes are applied by print(_:for:) exactly once.
+        var bodyOptions = formattingOptions
+        bodyOptions.customLinePrefix = ""
+        let body = Document(footnoteDefinition.blockChildren).format(options: bodyOptions)
+        let lines = body.split(separator: "\n", omittingEmptySubsequences: false)
+        print("[^\(footnoteDefinition.label)]: " + String(lines.first ?? ""), for: footnoteDefinition)
+        for line in lines.dropFirst() {
+            queueNewline()
+            print("    " + line, for: footnoteDefinition)
+        }
+    }
+
     public mutating func visitBlockQuote(_ blockQuote: BlockQuote) {
         if let parent = blockQuote.parent {
             if parent is BlockQuote {

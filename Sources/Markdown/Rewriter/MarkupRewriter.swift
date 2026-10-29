@@ -18,6 +18,12 @@ extension MarkupRewriter {
         }
         return markup.withUncheckedChildren(newChildren)
     }
+    public mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) -> Result {
+        return defaultVisit(footnoteDefinition)
+    }
+    public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) -> Result {
+        return defaultVisit(footnoteReference)
+    }
     public mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> Result {
         return defaultVisit(blockQuote)
     }

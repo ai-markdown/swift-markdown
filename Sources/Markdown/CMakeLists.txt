@@ -24,6 +24,7 @@ add_library(Markdown
   "Block Nodes/Block Container Blocks/Doxygen Commands/DoxygenReturns.swift"
   "Block Nodes/Block Container Blocks/BlockDirective.swift"
   "Block Nodes/Block Container Blocks/BlockQuote.swift"
+  "Block Nodes/Block Container Blocks/FootnoteDefinition.swift"
   "Block Nodes/Block Container Blocks/CustomBlock.swift"
   "Block Nodes/Block Container Blocks/ListItem.swift"
   "Block Nodes/Block Container Blocks/OrderedList.swift"
@@ -54,6 +55,7 @@ add_library(Markdown
   "Inline Nodes/Inline Leaves/SoftBreak.swift"
   "Inline Nodes/Inline Leaves/SymbolLink.swift"
   "Inline Nodes/Inline Leaves/Text.swift"
+  "Inline Nodes/Inline Leaves/FootnoteReference.swift"
   "Interpretive Nodes/Aside.swift"
   Parser/BlockDirectiveParser.swift
   Parser/CommonMarkConverter.swift

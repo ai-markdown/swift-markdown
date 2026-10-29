@@ -165,6 +165,14 @@ struct MarkupTreeDumper: MarkupWalker {
         path.removeLast()
     }
 
+    mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) {
+        dump(footnoteDefinition, customDescription: "label: \"\(footnoteDefinition.label)\"")
+    }
+
+    mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) {
+        dump(footnoteReference, customDescription: "label: \"\(footnoteReference.label)\"")
+    }
+
     mutating func visitText(_ text: Text) {
         dump(text, customDescription: "\"\(text.string)\"")
     }

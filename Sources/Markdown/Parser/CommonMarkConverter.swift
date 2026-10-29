@@ -35,6 +35,8 @@ import Foundation
 /// > Warning: **Do not make these public.**.
 fileprivate enum CommonMarkNodeType: String {
     case document
+    case footnoteDefinition = "footnote_definition"
+    case footnoteReference = "footnote_reference"
     case blockQuote = "block_quote"
     case list
     case item
@@ -135,6 +137,16 @@ fileprivate struct MarkupConverterState {
 
     /// The type of the last parsed cmark node.
     var nodeType: CommonMarkNodeType {
+        // cmark 0.9.0 exposes footnote enum constants, but its type-string getter
+        // returns "<unknown>" for them. Only these built-in types use enum dispatch.
+        switch cmark_node_get_type(node) {
+        case CMARK_NODE_FOOTNOTE_DEFINITION:
+            return .footnoteDefinition
+        case CMARK_NODE_FOOTNOTE_REFERENCE:
+            return .footnoteReference
+        default:
+            break
+        }
         let typeString = String(cString: cmark_node_get_type_string(node))
         guard let type = CommonMarkNodeType(rawValue: typeString) else {
             fatalError("Unknown cmark node type '\(typeString)' encountered during conversion")
@@ -178,6 +190,22 @@ struct MarkupParser {
         precondition(state.event == CMARK_EVENT_ENTER)
 
         switch state.nodeType {
+        case .footnoteDefinition:
+            let label = getLiteralContent(node: state.node)
+            let parsedRange = state.range(state.node)
+            let children = convertChildren(state)
+            precondition(children.state.event == CMARK_EVENT_EXIT)
+            precondition(children.state.node == state.node)
+            return MarkupConversion(state: children.state.next(),
+                                    result: .footnoteDefinition(label: label, parsedRange: parsedRange, children.result))
+        case .footnoteReference:
+            // cmark emits ENTER/EXIT even though references have no children.
+            let label = getLiteralContent(node: state.node)
+            let parsedRange = state.range(state.node)
+            let exit = state.next()
+            precondition(exit.event == CMARK_EVENT_EXIT && exit.node == state.node)
+            return MarkupConversion(state: exit.next(),
+                                    result: .footnoteReference(label: label, parsedRange: parsedRange))
         case .document:
             return convertDocument(state)
         case .blockQuote:
@@ -612,6 +640,9 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseFootnotes) {
+            cmarkOptions |= CMARK_OPT_FOOTNOTES | CMARK_OPT_FOOTNOTES_LOSSLESS
+        }
         if !options.contains(.disableSmartOpts) {
             cmarkOptions |= CMARK_OPT_SMART
         }

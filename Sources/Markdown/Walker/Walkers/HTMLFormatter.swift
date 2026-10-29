@@ -63,6 +63,25 @@ public struct HTMLFormatter: MarkupWalker {
         return format(document, options: options)
     }
 
+    /// Source-like fallback only. Footnote numbering and footer rendering are consumer tasks.
+    public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) {
+        result += escapedFootnoteText(footnoteReference.plainText)
+    }
+
+    /// Preserve the definition label visibly, followed by its ordinary block content.
+    public mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) {
+        result += "<p>"
+        result += escapedFootnoteText("[^\(footnoteDefinition.label)]:")
+        result += "</p>\n"
+        descendInto(footnoteDefinition)
+    }
+
+    private func escapedFootnoteText(_ text: String) -> String {
+        return text.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
     // MARK: Block elements
 
     public mutating func visitBlockQuote(_ blockQuote: BlockQuote) -> () {
