@@ -20,6 +20,7 @@ func makeMarkup(_ data: _MarkupData) -> Markup {
     case .definitionDescription: return DefinitionDescription(data)
     case .blockQuote:
         return BlockQuote(data)
+    case .linkReferenceDefinition: return LinkReferenceDefinition(data)
     case .mathBlock:
         return MathBlock(data)
     case .inlineMath:

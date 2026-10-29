@@ -868,6 +868,21 @@ public struct MarkupFormatter: MarkupWalker {
         print(sequence + padding + math.value + padding + sequence, for: math)
     }
 
+    public mutating func visitLinkReferenceDefinition(_ definition: LinkReferenceDefinition) {
+        if definition.indexInParent > 0 { ensurePrecedingNewlineCount(atLeast: 2) }
+        let label = definition.labelSource ?? definition.identifier
+        let destination = definition.destination.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\\", with: "&#92;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\r", with: "&#13;").replacingOccurrences(of: "\n", with: "&#10;")
+        var text = "[" + label + "]: <" + destination + ">"
+        if let title = definition.title {
+            let escaped = title.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\\", with: "&#92;").replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "\r", with: "&#13;").replacingOccurrences(of: "\n", with: "&#10;")
+            text += " \"" + escaped + "\""
+        }
+        for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if index > 0 { queueNewline() }
+            print(String(line), for: definition)
+        }
+    }
+
     public mutating func visitMathBlock(_ math: MathBlock) {
         if math.indexInParent > 0 { ensurePrecedingNewlineCount(atLeast: 2) }
         let sequence = mathSequence(math.value)

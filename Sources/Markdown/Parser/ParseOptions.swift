@@ -40,6 +40,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Enable raw math syntax: inline dollar runs require at least two characters; no LaTeX preprocessing is performed.
     public static let parseMath = ParseOptions(rawValue: 1 << 11)
 
+    /// Preserve ordinary link reference definitions in source order without rewriting link/image reference usages.
+    public static let parseReferenceDefinitions = ParseOptions(rawValue: 1 << 12)
+
     /// Enable block directive syntax.
     public static let parseBlockDirectives = ParseOptions(rawValue: 1 << 0)
 

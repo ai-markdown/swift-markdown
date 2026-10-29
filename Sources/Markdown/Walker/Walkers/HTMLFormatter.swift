@@ -123,6 +123,8 @@ public struct HTMLFormatter: MarkupWalker {
     public mutating func visitInlineMath(_ math: InlineMath) {
         result += "<code class=\"language-math math-inline\">" + escapedFootnoteText(math.value) + "</code>"
     }
+    public mutating func visitLinkReferenceDefinition(_ definition: LinkReferenceDefinition) {}
+
     public mutating func visitMathBlock(_ math: MathBlock) {
         result += "<pre><code class=\"language-math math-display\">" + escapedFootnoteText(math.value) + "</code></pre>\n"
     }

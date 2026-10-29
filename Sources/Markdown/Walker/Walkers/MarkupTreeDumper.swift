@@ -169,6 +169,10 @@ struct MarkupTreeDumper: MarkupWalker {
         dump(node, customDescription: "spread: \(node.spread)")
     }
 
+    mutating func visitLinkReferenceDefinition(_ definition: LinkReferenceDefinition) {
+        dump(definition, customDescription: "identifier: \"\(definition.identifier)\" destination: \"\(definition.destination)\"")
+    }
+
     mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) {
         dump(footnoteDefinition, customDescription: "label: \"\(footnoteDefinition.label)\"")
     }

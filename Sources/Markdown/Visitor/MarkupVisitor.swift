@@ -232,6 +232,8 @@ public protocol MarkupVisitor<Result> {
 
     mutating func visitHighlight(_ highlight: Highlight) -> Result
 
+    mutating func visitLinkReferenceDefinition(_ definition: LinkReferenceDefinition) -> Result
+
     mutating func visitMathBlock(_ math: MathBlock) -> Result
     mutating func visitInlineMath(_ math: InlineMath) -> Result
 
@@ -418,6 +420,8 @@ extension MarkupVisitor {
     public mutating func visitStrikethrough(_ strikethrough: Strikethrough) -> Result {
         return defaultVisit(strikethrough)
     }
+
+    public mutating func visitLinkReferenceDefinition(_ definition: LinkReferenceDefinition) -> Result { return defaultVisit(definition) }
 
     public mutating func visitMathBlock(_ math: MathBlock) -> Result { return defaultVisit(math) }
     public mutating func visitInlineMath(_ math: InlineMath) -> Result { return defaultVisit(math) }

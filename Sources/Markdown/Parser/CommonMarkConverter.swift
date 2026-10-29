@@ -41,6 +41,7 @@ fileprivate enum CommonMarkNodeType: String {
     case list
     case item
     case codeBlock = "code_block"
+    case linkReferenceDefinition = "link_reference_definition"
     case mathBlock = "math_block"
     case inlineMath = "math_inline"
     case htmlBlock = "html_block"
@@ -220,6 +221,13 @@ struct MarkupParser {
             return convertList(state)
         case .item:
             return convertListItem(state)
+        case .linkReferenceDefinition:
+            let sourceLabel = String(cString: cmark_node_get_reference_identifier_source(state.node))
+            let label = String(cString: cmark_node_get_reference_label(state.node))
+            let destination = String(cString: cmark_node_get_reference_destination(state.node))
+            let title = cmark_node_get_reference_title(state.node).map { String(cString: $0) }
+            let identifier = referenceIdentifier(sourceLabel)
+            return MarkupConversion(state: state.next(), result: .linkReferenceDefinition(parsedRange: state.range(state.node), label: label, identifier: identifier, destination: destination, title: title, labelSource: sourceLabel))
         case .mathBlock:
             let value = getLiteralContent(node: state.node)
             let rawMeta = String(cString: cmark_node_get_fence_info(state.node))
@@ -306,6 +314,21 @@ struct MarkupParser {
             state = conversion.state
         }
         return MarkupConversion(state: state, result: layout)
+    }
+
+    // mdast-util-from-markdown: normalizeIdentifier(rawLabel).toLowerCase().
+    private static func referenceIdentifier(_ text: String) -> String {
+        var result = "", pending = false
+        for scalar in text.unicodeScalars {
+            if scalar.value == 9 || scalar.value == 10 || scalar.value == 13 || scalar.value == 32 {
+                pending = !result.isEmpty
+            } else {
+                if pending { result.append(" ") }
+                result.unicodeScalars.append(scalar)
+                pending = false
+            }
+        }
+        return result.lowercased().uppercased().lowercased()
     }
 
     private static func convertDocument(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -678,6 +701,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseReferenceDefinitions) { cmarkOptions |= CMARK_OPT_REFERENCE_DEFINITIONS }
         if options.contains(.parseMath) { cmarkOptions |= CMARK_OPT_MATH }
         if options.contains(.parseWebEmphasis) {
             cmarkOptions |= CMARK_OPT_WEB_EMPHASIS

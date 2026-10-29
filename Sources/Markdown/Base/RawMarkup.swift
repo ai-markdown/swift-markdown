@@ -23,6 +23,7 @@ enum RawMarkupData: Equatable {
     case footnoteDefinition(label: String)
     case footnoteReference(label: String)
     case codeBlock(String, language: String?)
+    case linkReferenceDefinition(label: String, identifier: String, destination: String, title: String?, labelSource: String?)
     case mathBlock(String, meta: String?)
     case inlineMath(String)
     case customBlock
@@ -299,6 +300,10 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
 
     static func inlineCode(parsedRange: SourceRange?, code: String) -> RawMarkup {
         return .create(data: .inlineCode(code), parsedRange: parsedRange, children: [])
+    }
+
+    static func linkReferenceDefinition(parsedRange: SourceRange?, label: String, identifier: String, destination: String, title: String?, labelSource: String?) -> RawMarkup {
+        return .create(data: .linkReferenceDefinition(label: label, identifier: identifier, destination: destination, title: title, labelSource: labelSource), parsedRange: parsedRange, children: [])
     }
 
     static func mathBlock(parsedRange: SourceRange?, value: String, meta: String?) -> RawMarkup {
