@@ -1,12 +1,12 @@
 import cmark_gfm
 
 /// Derive raw MDAST fields from actual footnote source labels; compute the identifier without first decoding the label.
-package struct FootnoteLabelMetadata: Sendable {
-    package let identifier: String
-    package let label: String
+public struct FootnoteLabelMetadata: Sendable {
+    public let identifier: String
+    public let label: String
 
     /// Parser source labels contain no NUL. Explicitly reject programmatic input outside the C label domain rather than truncating it.
-    package init?(rawSource: String) {
+    public init?(rawSource: String) {
         guard !rawSource.utf8.contains(0), rawSource.utf8.count <= Int32.max else { return nil }
         var count = 0
         guard let decoded = rawSource.withCString({ cmark_decode_reference_label($0, rawSource.utf8.count, &count) }) else { return nil }
