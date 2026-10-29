@@ -22,6 +22,12 @@ public struct ParseOptions: OptionSet, Sendable {
     /// It does not assign display numbers or generate a rendered footer.
     public static let parseFootnotes = ParseOptions(rawValue: 1 << 5)
 
+    /// Enable the two-equals inline highlight extension.
+    public static let parseHighlight = ParseOptions(rawValue: 1 << 6)
+
+    /// Disable the default table, strikethrough and task list extensions.
+    public static let disableGFM = ParseOptions(rawValue: 1 << 7)
+
     /// Enable block directive syntax.
     public static let parseBlockDirectives = ParseOptions(rawValue: 1 << 0)
 

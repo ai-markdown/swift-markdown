@@ -63,6 +63,7 @@ fileprivate enum CommonMarkNodeType: String {
     // Extensions
 
     case strikethrough
+    case highlight
 
     case table
     case tableHead = "table_header"
@@ -248,6 +249,8 @@ struct MarkupParser {
             return convertImage(state)
         case .strikethrough:
             return convertStrikethrough(state)
+        case .highlight:
+            return convertHighlight(state)
         case .taskListItem:
             return convertTaskListItem(state)
         case .table:
@@ -523,6 +526,16 @@ struct MarkupParser {
         return MarkupConversion(state: childConversion.state.next(), result: .strikethrough(parsedRange: parsedRange, childConversion.result))
     }
 
+    private static func convertHighlight(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
+        precondition(state.event == CMARK_EVENT_ENTER)
+        precondition(state.nodeType == .highlight)
+        let parsedRange = state.range(state.node)
+        let childConversion = convertChildren(state)
+        precondition(childConversion.state.node == state.node)
+        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
+        return MarkupConversion(state: childConversion.state.next(), result: .highlight(parsedRange: parsedRange, childConversion.result))
+    }
+
     private static func convertTaskListItem(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
         precondition(state.event == CMARK_EVENT_ENTER)
         precondition(state.nodeType == .taskListItem)
@@ -652,9 +665,14 @@ struct MarkupParser {
         
         let parser = cmark_parser_new(cmarkOptions)
         
-        cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("table"))
-        cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("strikethrough"))
-        cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("tasklist"))
+        if !options.contains(.disableGFM) {
+            cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("table"))
+            cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("strikethrough"))
+            cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("tasklist"))
+        }
+        if options.contains(.parseHighlight) {
+            cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("highlight"))
+        }
         cmark_parser_feed(parser, string, string.utf8.count)
         let rawDocument = cmark_parser_finish(parser)
         let initialState = MarkupConverterState(source: source, iterator: cmark_iter_new(rawDocument), event: CMARK_EVENT_NONE, node: nil, options: options, headerSeen: false, pendingTableBody: nil).next()

@@ -46,6 +46,7 @@ enum RawMarkupData: Equatable {
 
     // Extensions
     case strikethrough
+    case highlight
 
     // `alignments` indicate the fixed column count of every row in the table.
     case table(columnAlignments: [Table.ColumnAlignment?])
@@ -323,6 +324,10 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
 
     static func strikethrough(parsedRange: SourceRange?, _ children: [RawMarkup]) -> RawMarkup {
         return .create(data: .strikethrough, parsedRange: parsedRange, children: children)
+    }
+
+    static func highlight(parsedRange: SourceRange?, _ children: [RawMarkup]) -> RawMarkup {
+        return .create(data: .highlight, parsedRange: parsedRange, children: children)
     }
 
     static func table(columnAlignments: [Table.ColumnAlignment?], parsedRange: SourceRange?, header: RawMarkup, body: RawMarkup) -> RawMarkup {

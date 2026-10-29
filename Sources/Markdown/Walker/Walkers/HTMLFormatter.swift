@@ -298,6 +298,10 @@ public struct HTMLFormatter: MarkupWalker {
         printInline(tag: "del", strikethrough)
     }
 
+    public mutating func visitHighlight(_ highlight: Highlight) -> () {
+        printInline(tag: "mark", highlight)
+    }
+
     public mutating func visitSymbolLink(_ symbolLink: SymbolLink) -> () {
         if let destination = symbolLink.destination {
             result += "<code>\(destination)</code>"
