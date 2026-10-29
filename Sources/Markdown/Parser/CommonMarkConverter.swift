@@ -670,6 +670,9 @@ struct MarkupParser {
             cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("strikethrough"))
             cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("tasklist"))
         }
+        if options.contains(.parseWebAutolinks) {
+            cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("web_autolink"))
+        }
         if options.contains(.parseHighlight) {
             cmark_parser_attach_syntax_extension(parser, cmark_find_syntax_extension("highlight"))
         }
