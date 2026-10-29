@@ -33,6 +33,12 @@ public extension SoftBreak {
         try! self.init(.softBreak(parsedRange: nil))
     }
 
+    /// The physical line ending captured by a parser event; nil when capture is disabled or the node is constructed programmatically, not a source position.
+    var physicalLineEnding: String? {
+        guard case let .softBreak(ending) = _data.raw.markup.data else { return nil }
+        return ending
+    }
+
     // MARK: PlainTextConvertibleMarkup
 
     var plainText: String {

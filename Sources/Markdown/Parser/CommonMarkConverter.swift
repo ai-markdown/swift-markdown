@@ -416,7 +416,14 @@ struct MarkupParser {
         precondition(state.event == CMARK_EVENT_ENTER)
         precondition(state.nodeType == .softBreak)
         let parsedRange = state.range(state.node)
-        return MarkupConversion(state: state.next(), result: .softBreak(parsedRange: parsedRange))
+        let ending: String?
+        switch cmark_node_get_softbreak_ending(state.node) {
+        case 10: ending = "\n"
+        case 13: ending = "\r"
+        case 0x0d0a: ending = "\r\n"
+        default: ending = nil
+        }
+        return MarkupConversion(state: state.next(), result: .softBreak(parsedRange: parsedRange, physicalLineEnding: ending))
     }
 
     private static func convertLineBreak(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -460,6 +467,7 @@ struct MarkupParser {
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
         if options.contains(.parseWebCodeSyntax) { cmarkOptions |= CMARK_OPT_WEB_CODE_SYNTAX }
+        if options.contains(.parseSoftBreakMetadata) { cmarkOptions |= Int32(CMARK_OPT_SOFTBREAK_METADATA) }
         if options.contains(.parseCodeMetadata) { cmarkOptions |= CMARK_OPT_CODE_METADATA }
         if options.contains(.parseWebCharacterReferences) { cmarkOptions |= CMARK_OPT_WEB_CHARACTER_REFERENCES }
         if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }

@@ -43,6 +43,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Capture raw code/inlineCode fields without changing existing display text; programmatic nodes have no such metadata.
     public static let parseCodeMetadata = ParseOptions(rawValue: 1 << 15)
 
+    /// Capture physical EOLs on actual SoftBreak events without changing existing display or serialization behavior.
+    public static let parseSoftBreakMetadata = ParseOptions(rawValue: 1 << 17)
+
     /// Accept Web code delimiter lengths without the legacy 80/255 limits.
     public static let parseWebCodeSyntax = ParseOptions(rawValue: 1 << 16)
 

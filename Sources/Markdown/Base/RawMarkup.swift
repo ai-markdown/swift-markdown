@@ -44,7 +44,7 @@ enum RawMarkupData: Equatable {
     case inlineHTML(String)
     case lineBreak
     case link(destination: String?, title: String?, referenceIdentity: ReferenceIdentity?)
-    case softBreak
+    case softBreak(physicalLineEnding: String?)
     case strong
     case text(String)
     case symbolLink(destination: String?)
@@ -338,8 +338,8 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
         return .create(data: .link(destination: destination, title: title, referenceIdentity: referenceIdentity), parsedRange: parsedRange, children: children)
     }
 
-    static func softBreak(parsedRange: SourceRange?) -> RawMarkup {
-        return .create(data: .softBreak, parsedRange: parsedRange, children: [])
+    static func softBreak(parsedRange: SourceRange?, physicalLineEnding: String? = nil) -> RawMarkup {
+        return .create(data: .softBreak(physicalLineEnding: physicalLineEnding), parsedRange: parsedRange, children: [])
     }
 
     static func strong(parsedRange: SourceRange?, _ children: [RawMarkup]) -> RawMarkup {
