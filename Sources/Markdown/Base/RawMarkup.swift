@@ -22,7 +22,7 @@ enum RawMarkupData: Equatable {
     case blockQuote
     case footnoteDefinition(label: String)
     case footnoteReference(label: String)
-    case codeBlock(String, language: String?)
+    case codeBlock(String, language: String?, metadata: CodeSyntaxMetadata?)
     case linkReferenceDefinition(label: String, identifier: String, destination: String, title: String?, labelSource: String?)
     case mathBlock(String, meta: String?)
     case inlineMath(String)
@@ -37,7 +37,7 @@ enum RawMarkupData: Equatable {
     case paragraph
     case blockDirective(name: String, nameLocation: SourceLocation?, arguments: DirectiveArgumentText)
 
-    case inlineCode(String)
+    case inlineCode(String, metadata: CodeSyntaxMetadata?)
     case customInline(String)
     case emphasis
     case image(source: String?, title: String?, referenceIdentity: ReferenceIdentity?)
@@ -252,8 +252,8 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
         return .create(data: .blockQuote, parsedRange: parsedRange, children: children)
     }
 
-    static func codeBlock(parsedRange: SourceRange?, code: String, language: String?) -> RawMarkup {
-        return .create(data: .codeBlock(code, language: language), parsedRange: parsedRange, children: [])
+    static func codeBlock(parsedRange: SourceRange?, code: String, language: String?, metadata: CodeSyntaxMetadata? = nil) -> RawMarkup {
+        return .create(data: .codeBlock(code, language: language, metadata: metadata), parsedRange: parsedRange, children: [])
     }
 
     static func customBlock(parsedRange: SourceRange?, _ children: [RawMarkup]) -> RawMarkup {
@@ -298,8 +298,8 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
 
     // MARK: Inline Creation
 
-    static func inlineCode(parsedRange: SourceRange?, code: String) -> RawMarkup {
-        return .create(data: .inlineCode(code), parsedRange: parsedRange, children: [])
+    static func inlineCode(parsedRange: SourceRange?, code: String, metadata: CodeSyntaxMetadata? = nil) -> RawMarkup {
+        return .create(data: .inlineCode(code, metadata: metadata), parsedRange: parsedRange, children: [])
     }
 
     static func linkReferenceDefinition(parsedRange: SourceRange?, label: String, identifier: String, destination: String, title: String?, labelSource: String?) -> RawMarkup {

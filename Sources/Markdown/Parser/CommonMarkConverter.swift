@@ -386,7 +386,7 @@ struct MarkupParser {
         let language = String(cString: cmark_node_get_fence_info(state.node))
         let code = getLiteralContent(node: state.node)
 
-        return MarkupConversion(state: state.next(), result: .codeBlock(parsedRange: parsedRange, code: code, language: language.isEmpty ? nil : language))
+        return MarkupConversion(state: state.next(), result: .codeBlock(parsedRange: parsedRange, code: code, language: language.isEmpty ? nil : language, metadata: CodeSyntaxMetadata(node: state.node)))
     }
 
     private static func convertHTMLBlock(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -435,7 +435,7 @@ struct MarkupParser {
            cmark_node_get_backtick_count(state.node) > 1 {
             return MarkupConversion(state: state.next(), result: .symbolLink(parsedRange: parsedRange, destination: literalContent))
         } else {
-            return MarkupConversion(state: state.next(), result: .inlineCode(parsedRange: parsedRange, code: literalContent))
+            return MarkupConversion(state: state.next(), result: .inlineCode(parsedRange: parsedRange, code: literalContent, metadata: CodeSyntaxMetadata(node: state.node)))
         }
     }
 
@@ -459,6 +459,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseCodeMetadata) { cmarkOptions |= CMARK_OPT_CODE_METADATA }
         if options.contains(.parseWebCharacterReferences) { cmarkOptions |= CMARK_OPT_WEB_CHARACTER_REFERENCES }
         if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }
         if options.contains(.parseReferenceDefinitions) { cmarkOptions |= CMARK_OPT_REFERENCE_DEFINITIONS }

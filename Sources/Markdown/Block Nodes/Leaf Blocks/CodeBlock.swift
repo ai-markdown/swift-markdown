@@ -35,7 +35,7 @@ public extension CodeBlock {
     /// The name of the syntax or programming language of the code block, which may be `nil` when unspecified.
     var language: String? {
         get {
-            guard case let .codeBlock(_, language) = _data.raw.markup.data else {
+            guard case let .codeBlock(_, language, _) = _data.raw.markup.data else {
                 fatalError("\(self) markup wrapped unexpected \(_data.raw)")
             }
             return language
@@ -48,7 +48,7 @@ public extension CodeBlock {
     /// The raw text representing the code of this block.
     var code: String {
         get {
-            guard case let .codeBlock(code, _) = _data.raw.markup.data else {
+            guard case let .codeBlock(code, _, _) = _data.raw.markup.data else {
                 fatalError("\(self) markup wrapped unexpected \(_data.raw)")
             }
             return code
@@ -56,6 +56,13 @@ public extension CodeBlock {
         set {
             _data = _data.replacingSelf(.codeBlock(parsedRange: nil, code: newValue, language: language))
         }
+    }
+
+    /// Independent Web fields from actual parsed tokens; existing code/language display properties are unchanged.
+    /// Unavailable for programmatically constructed nodes or after changing code/language.
+    var codeMetadata: CodeSyntaxMetadata? {
+        guard case let .codeBlock(_, _, metadata) = _data.raw.markup.data else { return nil }
+        return metadata
     }
 
     // MARK: Visitation

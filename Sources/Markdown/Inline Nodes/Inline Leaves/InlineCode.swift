@@ -36,7 +36,7 @@ public extension InlineCode {
     /// The literal text content.
     var code: String {
         get {
-            guard case let .inlineCode(code) = _data.raw.markup.data else {
+            guard case let .inlineCode(code, _) = _data.raw.markup.data else {
                 fatalError("\(self) markup wrapped unexpected \(_data.raw)")
             }
             return code
@@ -50,6 +50,12 @@ public extension InlineCode {
 
     var plainText: String {
         return "`\(code)`"
+    }
+
+    /// An independent raw MDAST value preserving physical EOLs and actual padding rules; the existing code property is unchanged.
+    var codeMetadata: CodeSyntaxMetadata? {
+        guard case let .inlineCode(_, metadata) = _data.raw.markup.data else { return nil }
+        return metadata
     }
 
     // MARK: Visitation

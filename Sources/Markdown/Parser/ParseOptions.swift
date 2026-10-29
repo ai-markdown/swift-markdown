@@ -40,6 +40,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Enable raw math syntax: inline dollar runs require at least two characters; no LaTeX preprocessing is performed.
     public static let parseMath = ParseOptions(rawValue: 1 << 11)
 
+    /// Capture raw code/inlineCode fields without changing existing display text; programmatic nodes have no such metadata.
+    public static let parseCodeMetadata = ParseOptions(rawValue: 1 << 15)
+
     /// Match Web single-pass character-reference decoding in ordinary text and link fields, preserving code and TeX content.
     public static let parseWebCharacterReferences = ParseOptions(rawValue: 1 << 14)
 
