@@ -35,6 +35,11 @@ public protocol MarkupVisitor<Result> {
      */
     mutating func visit(_ markup: Markup) -> Result
 
+    /// Visit a definition list.
+    mutating func visitDefinitionList(_ node: DefinitionList) -> Result
+    mutating func visitDefinitionTerm(_ node: DefinitionTerm) -> Result
+    mutating func visitDefinitionDescription(_ node: DefinitionDescription) -> Result
+
     /// Visit a preserved footnote definition.
     mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) -> Result
 
@@ -331,6 +336,10 @@ extension MarkupVisitor {
     public mutating func visit(_ markup: Markup) -> Result {
         return markup.accept(&self)
     }
+    public mutating func visitDefinitionList(_ node: DefinitionList) -> Result { return defaultVisit(node) }
+    public mutating func visitDefinitionTerm(_ node: DefinitionTerm) -> Result { return defaultVisit(node) }
+    public mutating func visitDefinitionDescription(_ node: DefinitionDescription) -> Result { return defaultVisit(node) }
+
     public mutating func visitFootnoteDefinition(_ footnoteDefinition: FootnoteDefinition) -> Result {
         return defaultVisit(footnoteDefinition)
     }

@@ -31,6 +31,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Observe raw adjacent characters for Web-compatible emphasis boundaries.
     public static let parseWebEmphasis = ParseOptions(rawValue: 1 << 9)
 
+    /// Preserve Web definition-list block containers.
+    public static let parseDefinitionLists = ParseOptions(rawValue: 1 << 10)
+
     /// Enable Web-compatible GFM literal URL tokenization before inline delimiters.
     public static let parseWebAutolinks = ParseOptions(rawValue: 1 << 8)
 

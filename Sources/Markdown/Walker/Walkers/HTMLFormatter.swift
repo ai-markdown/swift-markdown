@@ -63,6 +63,28 @@ public struct HTMLFormatter: MarkupWalker {
         return format(document, options: options)
     }
 
+    public mutating func visitDefinitionList(_ node: DefinitionList) {
+        result += "<dl>\n"
+        descendInto(node)
+        result += "</dl>\n"
+    }
+
+    public mutating func visitDefinitionTerm(_ node: DefinitionTerm) {
+        result += "<dt>"
+        descendInto(node)
+        result += "</dt>\n"
+    }
+
+    public mutating func visitDefinitionDescription(_ node: DefinitionDescription) {
+        result += "<dd>"
+        for (index, child) in node.children.enumerated() {
+            if node.spread || index > 0 || !(child is Paragraph) { result += "\n" }
+            if !node.spread && child is Paragraph { descendInto(child) }
+            else { visit(child) }
+        }
+        result += "</dd>\n"
+    }
+
     /// Source-like fallback only. Footnote numbering and footer rendering are consumer tasks.
     public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) {
         result += escapedFootnoteText(footnoteReference.plainText)

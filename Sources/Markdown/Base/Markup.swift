@@ -15,6 +15,9 @@ func makeMarkup(_ data: _MarkupData) -> Markup {
         return FootnoteDefinition(data)
     case .footnoteReference:
         return FootnoteReference(data)
+    case .definitionList: return DefinitionList(data)
+    case .definitionTerm: return DefinitionTerm(data)
+    case .definitionDescription: return DefinitionDescription(data)
     case .blockQuote:
         return BlockQuote(data)
     case .codeBlock:

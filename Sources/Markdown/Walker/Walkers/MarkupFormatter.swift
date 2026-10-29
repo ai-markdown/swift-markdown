@@ -707,6 +707,32 @@ public struct MarkupFormatter: MarkupWalker {
         }
     }
 
+    public mutating func visitDefinitionList(_ node: DefinitionList) {
+        if node.indexInParent > 0 { ensurePrecedingNewlineCount(atLeast: 2) }
+        descendInto(node)
+    }
+
+    public mutating func visitDefinitionTerm(_ node: DefinitionTerm) {
+        if node.indexInParent > 0 {
+            let previous = node.parent?.child(at: node.indexInParent - 1)
+            ensurePrecedingNewlineCount(atLeast: previous is DefinitionDescription ? 2 : 1)
+        }
+        descendInto(node)
+    }
+
+    public mutating func visitDefinitionDescription(_ node: DefinitionDescription) {
+        ensurePrecedingNewlineCount(atLeast: node.spread ? 2 : 1)
+        var bodyOptions = formattingOptions
+        bodyOptions.customLinePrefix = ""
+        let body = Document(node.blockChildren).format(options: bodyOptions)
+        let lines = body.split(separator: "\n", omittingEmptySubsequences: false)
+        print(": " + String(lines.first ?? ""), for: node)
+        for line in lines.dropFirst() {
+            queueNewline()
+            print("  " + line, for: node)
+        }
+    }
+
     public mutating func visitFootnoteReference(_ footnoteReference: FootnoteReference) {
         print(footnoteReference.plainText, for: footnoteReference)
     }

@@ -42,6 +42,9 @@ fileprivate enum CommonMarkNodeType: String {
     case item
     case codeBlock = "code_block"
     case htmlBlock = "html_block"
+    case definitionList = "definition_list"
+    case definitionTerm = "definition_term"
+    case definitionDescription = "definition_description"
     case customBlock = "custom_block"
     case paragraph
     case heading
@@ -251,6 +254,8 @@ struct MarkupParser {
             return convertStrikethrough(state)
         case .highlight:
             return convertHighlight(state)
+        case .definitionList, .definitionTerm, .definitionDescription:
+            return convertDefinition(state)
         case .taskListItem:
             return convertTaskListItem(state)
         case .table:
@@ -526,6 +531,18 @@ struct MarkupParser {
         return MarkupConversion(state: childConversion.state.next(), result: .strikethrough(parsedRange: parsedRange, childConversion.result))
     }
 
+    private static func convertDefinition(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
+        let parsedRange = state.range(state.node)
+        let children = convertChildren(state)
+        let result: RawMarkup
+        switch state.nodeType {
+        case .definitionList: result = .definitionList(parsedRange: parsedRange, children.result)
+        case .definitionTerm: result = .definitionTerm(parsedRange: parsedRange, children.result)
+        default: result = .definitionDescription(spread: cmark_node_get_definition_spread(state.node) != 0, parsedRange: parsedRange, children.result)
+        }
+        return MarkupConversion(state: children.state.next(), result: result)
+    }
+
     private static func convertHighlight(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
         precondition(state.event == CMARK_EVENT_ENTER)
         precondition(state.nodeType == .highlight)
@@ -656,6 +673,7 @@ struct MarkupParser {
         if options.contains(.parseWebEmphasis) {
             cmarkOptions |= CMARK_OPT_WEB_EMPHASIS
         }
+        if options.contains(.parseDefinitionLists) { cmarkOptions |= CMARK_OPT_DEFINITION_LISTS }
         if options.contains(.parseFootnotes) {
             cmarkOptions |= CMARK_OPT_FOOTNOTES | CMARK_OPT_FOOTNOTES_LOSSLESS
         }
