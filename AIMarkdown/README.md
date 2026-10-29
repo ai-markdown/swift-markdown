@@ -1,0 +1,7 @@
+# AI Markdown Swift Markdown
+
+This branch maintains the Swift AST and C parser bridge used by AI Markdown, including lossless footnotes and references, highlight and definition-list nodes, math nodes, Web-compatible parsing options, source origins, and code and soft-break metadata. It also retains the upstream CAtomic support code. Parsing and AST conversion belong here; application document models, rendering UI, and layout remain outside this fork.
+
+The upstream baseline is `25cb61d3482054b09ae76ca4f281b1bfe7fe5a43`. This repository retains upstream module and symbol names. The `ai-markdown-parser-swift` integration repository pins compatible revisions of this fork and `swift-cmark`, generates isolated sources, runs integration checks, and distributes the Swift Package. Maintain semantic changes in the corresponding fork rather than reapplying the same patches during integration.
+
+Original implementation provenance, patch paths, and checksums are recorded in `provenance.json`. Third-party licenses are bundled in `ThirdPartyLicenses`; upstream license files remain unchanged. Source paths in the provenance record refer to the pinned `ai-markdown-swift` source repository, not to files in this fork.

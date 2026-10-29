@@ -1,0 +1,96 @@
+{
+  "sourceRepository": "https://github.com/ai-markdown/ai-markdown-swift.git",
+  "upstreamBaseline": "25cb61d3482054b09ae76ca4f281b1bfe7fe5a43",
+  "changes": [
+    {
+      "change": "feat(footnotes): expose lossless footnote definitions and references",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/footnote-swift-probe/swift-ast.patch",
+      "sha256": "5a6604b89258b57c8eed6ae38a7bb0b577477630bda3d37afd1f9a74fdc6aa08"
+    },
+    {
+      "change": "feat(highlight): add highlight nodes and configurable GFM extensions",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/highlight-probe/swift-highlight.patch",
+      "sha256": "b51d39b1c53be2103e9ffc8b733c008c72e54490ed68f14c9c15b07d003d58c6"
+    },
+    {
+      "change": "feat(autolinks): expose Web-compatible literal link parsing",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/url-tokenizer-probe/swift-web-autolink.patch",
+      "sha256": "544bbf6bd3af962334d2c6265698f8a20ab6f21c4fb4a0e3c3be75211c951568"
+    },
+    {
+      "change": "feat(emphasis): expose opt-in Web-compatible delimiter boundaries",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/emphasis-probe/swift-web-emphasis.patch",
+      "sha256": "57821fb9b53e448d41d6e91639f5c7041d02642f01110683db8935b1caf0a440"
+    },
+    {
+      "change": "feat(definition-lists): add term and description AST nodes",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/definition-list-probe/swift-definition-list.patch",
+      "sha256": "0b950fc4f6e9efca60268edab424e5184cf21fcd1a40210a85041c3a11949325"
+    },
+    {
+      "change": "feat(math): expose inline and block TeX nodes with opt-in parsing",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/math-parser-probe/swift-math.patch",
+      "sha256": "17685aa954bc1960d01b3daf7cb4fbacc821513966e4ac489f189d9581690242"
+    },
+    {
+      "change": "feat(markup): preserve source-origin identifiers through child rewrites",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/source-origin-probe/swift-source-origin.patch",
+      "sha256": "b09cd2f3e6a47bb1b518bac6570875558d790d871ae6f948cee0a5a3dfa17138"
+    },
+    {
+      "change": "feat(references): expose source-positioned link definition nodes",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/reference-definition-probe/swift-reference-definitions.patch",
+      "sha256": "259fd67d31ccea309f5d12056caaf1d91a884cbaca0873bccaa4b12071a84950"
+    },
+    {
+      "change": "feat(references): preserve parsed link and image reference identity",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/reference-usage-probe/swift-reference-usages.patch",
+      "sha256": "99e422b3dacbd2662b2d46fe4c19132e95ab9a922cda28c0f6894d84b20d5c3e"
+    },
+    {
+      "change": "refactor(parser): convert CMark containers with an explicit frame stack",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/iterative-converter-probe/swift-iterative-converter.patch",
+      "sha256": "830a1e1ef2e258f98d025cb4f70c16e6f8e67326b4e0e4a19985192cad927293"
+    },
+    {
+      "change": "feat(decoding): expose Web character-reference parsing semantics",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/web-character-reference-probe/swift-web-character-references.patch",
+      "sha256": "b7ae8e0223e8a8331c4552b422cb874342fd5fb6bb910e81fa170f3e3dd5a8fd"
+    },
+    {
+      "change": "feat(footnotes): derive label metadata from raw source labels",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/footnote-label-probe/swift-footnote-label.patch",
+      "sha256": "2a52beeee57f86d5922e840bdaf5340fc080386a65ea87613ed0b4fc60dc15b1"
+    },
+    {
+      "change": "feat(code): expose parser-derived code syntax metadata",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/code-metadata-probe/swift-code-metadata.patch",
+      "sha256": "ff2ba30d4e46cfd6d32e6ae841b46082b06fef458df5d888b97f8dfe42507688"
+    },
+    {
+      "change": "feat(code): expose opt-in support for long Web code delimiters",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/code-delimiter-probe/swift-web-code-syntax.patch",
+      "sha256": "828995574d7b881ede7922337eb9668316a181663820b12670d6bf9af46da4d2"
+    },
+    {
+      "change": "feat(softbreaks): expose physical line endings captured during parsing",
+      "sourceRevision": "42cc391c9d95d6c0b36c7ae1f43e64d57340264d",
+      "patch": "scripts/softbreak-metadata-probe/swift-softbreak-metadata.patch",
+      "sha256": "5152f46ecc69faa65607e9600e5102e89ed87287ceea9193db0eaa5dd2a86737"
+    }
+  ]
+}
