@@ -192,106 +192,171 @@ fileprivate struct MarkupConverterState {
 
 /// Parses markup source and returns a `Markup` node representing the parsed source.
 struct MarkupParser {
-    /// Dispatches into specific conversion methods from every kind of cmark element, returning the resulting `RawMarkup`.
-    private static func convertAnyElement(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
+    /// One frame per actual container; only next advances the cmark iterator and table state.
+    private struct ConversionFrame {
+        let state: MarkupConverterState
+        let type: CommonMarkNodeType
+        let range: SourceRange?
+        var children: [RawMarkup] = []
 
+        init(_ state: MarkupConverterState) {
+            self.state = state
+            type = state.nodeType
+            range = state.range(state.node)
+        }
+    }
+
+    /// Explicit enter/exit postorder conversion; all containers share one loop without Swift recursion proportional to AST depth.
+    private static func convertAnyElement(_ initialState: MarkupConverterState) -> MarkupConversion<RawMarkup> {
+        precondition(initialState.event == CMARK_EVENT_ENTER)
+        var state = initialState
+        var frames: [ConversionFrame] = []
+        while true {
+            if state.event == CMARK_EVENT_ENTER {
+                switch state.nodeType {
+                case .document, .footnoteDefinition, .blockQuote, .list, .item, .customBlock,
+                     .paragraph, .heading, .emphasis, .strong, .link, .image, .strikethrough,
+                     .highlight, .definitionList, .definitionTerm, .definitionDescription,
+                     .taskListItem, .table, .tableHead, .tableRow, .tableCell, .inlineAttributes:
+                    frames.append(ConversionFrame(state))
+                    state = state.next()
+                default:
+                    let conversion = convertLeaf(state)
+                    guard !frames.isEmpty else { return conversion }
+                    frames[frames.count - 1].children.append(conversion.result)
+                    state = conversion.state
+                }
+            } else {
+                precondition(state.event == CMARK_EVENT_EXIT)
+                guard let frame = frames.popLast() else { preconditionFailure("Missing cmark container conversion frame") }
+                precondition(state.node == frame.state.node)
+                let result = finishContainer(frame, exit: state)
+                state = state.next(clearPendingTableBody: frame.type == .table)
+                guard !frames.isEmpty else { return MarkupConversion(state: state, result: result) }
+                frames[frames.count - 1].children.append(result)
+            }
+        }
+    }
+
+    private static func finishContainer(_ frame: ConversionFrame, exit: MarkupConverterState) -> RawMarkup {
+        let state = frame.state
+        let range = frame.range
+        let children = frame.children
+        switch frame.type {
+        case .document: return .document(parsedRange: range, children)
+        case .footnoteDefinition: return .footnoteDefinition(label: getLiteralContent(node: state.node), parsedRange: range, children)
+        case .blockQuote: return .blockQuote(parsedRange: range, children)
+        case .list:
+            for child in children {
+                guard case .listItem = child.data else { fatalError("Converted cmark list had a node other than RawMarkup.listItem") }
+            }
+            switch cmark_node_get_list_type(state.node) {
+            case CMARK_BULLET_LIST: return .unorderedList(parsedRange: range, children)
+            case CMARK_ORDERED_LIST: return .orderedList(parsedRange: range, children, startIndex: UInt(cmark_node_get_list_start(state.node)))
+            default: fatalError("cmark reported a list node but said its list type is CMARK_NO_LIST?")
+            }
+        case .item: return .listItem(checkbox: .none, parsedRange: range, children)
+        case .taskListItem:
+            let checkbox: Checkbox = cmark_gfm_extensions_get_tasklist_item_checked(state.node) ? .checked : .unchecked
+            return .listItem(checkbox: checkbox, parsedRange: range, children)
+        case .customBlock: return .customBlock(parsedRange: range, children)
+        case .paragraph: return .paragraph(parsedRange: range, children)
+        case .heading: return .heading(level: Int(cmark_node_get_heading_level(state.node)), parsedRange: range, children)
+        case .emphasis: return .emphasis(parsedRange: range, children)
+        case .strong: return .strong(parsedRange: range, children)
+        case .strikethrough: return .strikethrough(parsedRange: range, children)
+        case .highlight: return .highlight(parsedRange: range, children)
+        case .definitionList: return .definitionList(parsedRange: range, children)
+        case .definitionTerm: return .definitionTerm(parsedRange: range, children)
+        case .definitionDescription: return .definitionDescription(spread: cmark_node_get_definition_spread(state.node) != 0, parsedRange: range, children)
+        case .link:
+            let reference = referenceIdentity(state)
+            let destination = String(cString: cmark_node_get_url(state.node))
+            let title = String(cString: cmark_node_get_title(state.node))
+            return .link(destination: reference == nil && destination.isEmpty ? nil : destination,
+                         title: title.isEmpty ? nil : title, parsedRange: range, referenceIdentity: reference, children)
+        case .image:
+            let reference = referenceIdentity(state)
+            let source = String(cString: cmark_node_get_url(state.node))
+            let title = String(cString: cmark_node_get_title(state.node))
+            return .image(source: reference == nil && source.isEmpty ? nil : source,
+                          title: title.isEmpty ? nil : title, parsedRange: range, referenceIdentity: reference, children)
+        case .table: return finishTable(state, range: range, children: children, exit: exit)
+        case .tableHead: return .tableHead(parsedRange: range, columns: children)
+        case .tableRow: return .tableRow(parsedRange: range, children)
+        case .tableCell:
+            return .tableCell(parsedRange: range, colspan: UInt(cmark_gfm_extensions_get_table_cell_colspan(state.node)),
+                              rowspan: UInt(cmark_gfm_extensions_get_table_cell_rowspan(state.node)), children)
+        case .inlineAttributes:
+            return .inlineAttributes(attributes: String(cString: cmark_node_get_attributes(state.node)), parsedRange: range, children)
+        default: preconditionFailure("Expected a cmark container type")
+        }
+    }
+
+    private static func finishTable(_ state: MarkupConverterState, range: SourceRange?, children input: [RawMarkup], exit: MarkupConverterState) -> RawMarkup {
+        let columnCount = Int(cmark_gfm_extensions_get_table_columns(state.node))
+        let alignments = (0..<columnCount).map { column -> Table.ColumnAlignment? in
+            let ascii = cmark_gfm_extensions_get_table_alignments(state.node)[column]
+            let character = Character(UnicodeScalar(ascii))
+            switch character {
+            case "l": return .left
+            case "r": return .right
+            case "c": return .center
+            case "\0": return nil
+            default: fatalError("Unexpected table column character for cmark table: \(character) (0x\(String(ascii, radix: 16)))")
+            }
+        }
+        var rows = input
+        let header: RawMarkup
+        if let first = rows.first, case .tableHead = first.data {
+            header = first
+            rows.removeFirst()
+        } else { header = .tableHead(parsedRange: nil, columns: []) }
+        let body: RawMarkup
+        if rows.isEmpty {
+            precondition(exit.pendingTableBody == nil)
+            body = .tableBody(parsedRange: nil, rows: [])
+        } else {
+            guard let pending = exit.pendingTableBody else { preconditionFailure("Table body is missing its actual iterator state") }
+            body = .tableBody(parsedRange: pending.range, rows: rows)
+        }
+        return .table(columnAlignments: alignments, parsedRange: range, header: header, body: body)
+    }
+
+    private static func convertLeaf(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
         switch state.nodeType {
-        case .footnoteDefinition:
-            let label = getLiteralContent(node: state.node)
-            let parsedRange = state.range(state.node)
-            let children = convertChildren(state)
-            precondition(children.state.event == CMARK_EVENT_EXIT)
-            precondition(children.state.node == state.node)
-            return MarkupConversion(state: children.state.next(),
-                                    result: .footnoteDefinition(label: label, parsedRange: parsedRange, children.result))
         case .footnoteReference:
-            // cmark emits ENTER/EXIT even though references have no children.
+            // cmark still emits ENTER/EXIT for this leaf; preserve the existing explicit skip.
             let label = getLiteralContent(node: state.node)
-            let parsedRange = state.range(state.node)
+            let range = state.range(state.node)
             let exit = state.next()
             precondition(exit.event == CMARK_EVENT_EXIT && exit.node == state.node)
-            return MarkupConversion(state: exit.next(),
-                                    result: .footnoteReference(label: label, parsedRange: parsedRange))
-        case .document:
-            return convertDocument(state)
-        case .blockQuote:
-            return convertBlockQuote(state)
-        case .list:
-            return convertList(state)
-        case .item:
-            return convertListItem(state)
+            return MarkupConversion(state: exit.next(), result: .footnoteReference(label: label, parsedRange: range))
         case .linkReferenceDefinition:
             let sourceLabel = String(cString: cmark_node_get_reference_identifier_source(state.node))
             let label = String(cString: cmark_node_get_reference_label(state.node))
             let destination = String(cString: cmark_node_get_reference_destination(state.node))
             let title = cmark_node_get_reference_title(state.node).map { String(cString: $0) }
-            let identifier = referenceIdentifier(sourceLabel)
-            return MarkupConversion(state: state.next(), result: .linkReferenceDefinition(parsedRange: state.range(state.node), label: label, identifier: identifier, destination: destination, title: title, labelSource: sourceLabel))
+            return MarkupConversion(state: state.next(), result: .linkReferenceDefinition(parsedRange: state.range(state.node), label: label,
+                identifier: referenceIdentifier(sourceLabel), destination: destination, title: title, labelSource: sourceLabel))
         case .mathBlock:
             let value = getLiteralContent(node: state.node)
-            let rawMeta = String(cString: cmark_node_get_fence_info(state.node))
-            return MarkupConversion(state: state.next(), result: .mathBlock(parsedRange: state.range(state.node), value: value, meta: rawMeta.isEmpty ? nil : rawMeta))
-        case .inlineMath:
-            return MarkupConversion(state: state.next(), result: .inlineMath(parsedRange: state.range(state.node), value: getLiteralContent(node: state.node)))
-        case .codeBlock:
-            return convertCodeBlock(state)
-        case .htmlBlock:
-            return convertHTMLBlock(state)
-        case .customBlock:
-            return convertCustomBlock(state)
-        case .paragraph:
-            return convertParagraph(state)
-        case .heading:
-            return convertHeading(state)
-        case .thematicBreak:
-            return convertThematicBreak(state)
-        case .text:
-            return convertText(state)
-        case .softBreak:
-            return convertSoftBreak(state)
-        case .lineBreak:
-            return convertLineBreak(state)
-        case .code:
-            return convertInlineCode(state)
-        case .html:
-            return convertInlineHTML(state)
-        case .customInline:
-            return convertCustomInline(state)
-        case .emphasis:
-            return convertEmphasis(state)
-        case .strong:
-            return convertStrong(state)
-        case .link:
-            return convertLink(state)
-        case .image:
-            return convertImage(state)
-        case .strikethrough:
-            return convertStrikethrough(state)
-        case .highlight:
-            return convertHighlight(state)
-        case .definitionList, .definitionTerm, .definitionDescription:
-            return convertDefinition(state)
-        case .taskListItem:
-            return convertTaskListItem(state)
-        case .table:
-            return convertTable(state)
-        case .tableHead:
-            return convertTableHeader(state)
-        case .tableRow:
-            return convertTableRow(state)
-        case .tableCell:
-            return convertTableCell(state)
-        case .inlineAttributes:
-            return convertInlineAttributes(state)
-        default:
-            fatalError("Unknown cmark node type '\(state.nodeType.rawValue)' encountered during conversion")
+            let meta = String(cString: cmark_node_get_fence_info(state.node))
+            return MarkupConversion(state: state.next(), result: .mathBlock(parsedRange: state.range(state.node), value: value, meta: meta.isEmpty ? nil : meta))
+        case .inlineMath: return MarkupConversion(state: state.next(), result: .inlineMath(parsedRange: state.range(state.node), value: getLiteralContent(node: state.node)))
+        case .codeBlock: return convertCodeBlock(state)
+        case .htmlBlock: return convertHTMLBlock(state)
+        case .thematicBreak: return convertThematicBreak(state)
+        case .text: return convertText(state)
+        case .softBreak: return convertSoftBreak(state)
+        case .lineBreak: return convertLineBreak(state)
+        case .code: return convertInlineCode(state)
+        case .html: return convertInlineHTML(state)
+        case .customInline: return convertCustomInline(state)
+        default: fatalError("Unknown cmark node type '\(state.nodeType.rawValue)' encountered during conversion")
         }
     }
 
-    /// Returns the raw literal text for a cmark node.
-    ///
-    /// - parameter node: An opaque pointer to a `cmark_node`.
     private static func getLiteralContent(node: UnsafeMutablePointer<cmark_node>!) -> String {
         guard let rawText = cmark_node_get_literal(node) else {
             fatalError("Expected literal content for cmark node but got null pointer")
@@ -299,83 +364,19 @@ struct MarkupParser {
         return String(cString: rawText)
     }
 
-    /// Converts the children of the given state's cmark node and return them all.
-    ///
-    /// - parameter originalState: The state containing the node whose children you want to convert.
-    /// - returns: A new conversion containing all of the node's converted children.
-    private static func convertChildren(_ originalState: MarkupConverterState) -> MarkupConversion<[RawMarkup]> {
-        let root = originalState.node
-        var state = originalState.next()
-        var layout = [RawMarkup]()
-
-        while state.node != root && state.event != CMARK_EVENT_EXIT {
-            let conversion = convertAnyElement(state)
-            layout.append(conversion.result)
-            state = conversion.state
-        }
-        return MarkupConversion(state: state, result: layout)
-    }
-
-    // mdast-util-from-markdown: normalizeIdentifier(rawLabel).toLowerCase().
     private static func referenceIdentifier(_ text: String) -> String {
         guard let identifier = aimarkdown_cmark_reference_identifier(text) else { return "" }
         defer { aimarkdown_cmark_reference_identifier_free(identifier) }
         return String(cString: identifier)
     }
 
-    private static func convertDocument(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .document)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        precondition(childConversion.state.node == state.node)
-        return MarkupConversion(state: childConversion.state.next(), result: .document(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertBlockQuote(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .blockQuote)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .blockQuote(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertList(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .list)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-
-        for child in childConversion.result {
-            guard case .listItem = child.data else {
-                fatalError("Converted cmark list had a node other than RawMarkup.listItem")
-            }
-        }
-
-        switch cmark_node_get_list_type(state.node) {
-        case CMARK_BULLET_LIST:
-            return MarkupConversion(state: childConversion.state.next(), result: .unorderedList(parsedRange: parsedRange, childConversion.result))
-        case CMARK_ORDERED_LIST:
-            let cmarkStart = UInt(cmark_node_get_list_start(state.node))
-            return MarkupConversion(state: childConversion.state.next(), result: .orderedList(parsedRange: parsedRange, childConversion.result, startIndex: cmarkStart))
-        default:
-            fatalError("cmark reported a list node but said its list type is CMARK_NO_LIST?")
-        }
-    }
-
-    private static func convertListItem(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .item)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .listItem(checkbox: .none, parsedRange: parsedRange, childConversion.result))
+    private static func referenceIdentity(_ state: MarkupConverterState) -> ReferenceIdentity? {
+        let kind = aimarkdown_cmark_node_get_reference_usage_type(state.node)
+        guard kind != 0 else { return nil }
+        let source = String(cString: aimarkdown_cmark_node_get_reference_usage_source(state.node))
+        let label = String(cString: aimarkdown_cmark_node_get_reference_usage_label(state.node))
+        let type: ReferenceIdentity.ReferenceType = kind == 3 ? .full : kind == 2 ? .collapsed : .shortcut
+        return ReferenceIdentity(identifier: referenceIdentifier(source), label: label, referenceType: type, labelSource: source)
     }
 
     private static func convertCodeBlock(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -394,37 +395,6 @@ struct MarkupParser {
         let parsedRange = state.range(state.node)
         let html = getLiteralContent(node: state.node)
         return MarkupConversion(state: state.next(), result: .htmlBlock(parsedRange: parsedRange, html: html))
-    }
-
-    private static func convertCustomBlock(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .customBlock)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .customBlock(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertParagraph(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .paragraph)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .paragraph(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertHeading(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .heading)
-        let parsedRange = state.range(state.node)
-        let headingLevel = Int(cmark_node_get_heading_level(state.node))
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .heading(level: headingLevel, parsedRange: parsedRange, childConversion.result))
     }
 
     private static func convertThematicBreak(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -484,223 +454,6 @@ struct MarkupParser {
         let text = getLiteralContent(node: state.node)
         return MarkupConversion(state: state.next(), result: .customInline(parsedRange: parsedRange, text: text))
     }
-
-    private static func convertEmphasis(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .emphasis)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .emphasis(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertStrong(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .strong)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .strong(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func referenceIdentity(_ state: MarkupConverterState) -> ReferenceIdentity? {
-        let kind = aimarkdown_cmark_node_get_reference_usage_type(state.node)
-        guard kind != 0 else { return nil }
-        let source = String(cString: aimarkdown_cmark_node_get_reference_usage_source(state.node))
-        let label = String(cString: aimarkdown_cmark_node_get_reference_usage_label(state.node))
-        let type: ReferenceIdentity.ReferenceType = kind == 3 ? .full : kind == 2 ? .collapsed : .shortcut
-        return ReferenceIdentity(identifier: referenceIdentifier(source), label: label, referenceType: type, labelSource: source)
-    }
-
-    private static func convertLink(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .link)
-        let parsedRange = state.range(state.node)
-        let reference = referenceIdentity(state)
-        let childConversion = convertChildren(state)
-        let destination = String(cString: cmark_node_get_url(state.node))
-        let title = String(cString: cmark_node_get_title(state.node))
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(
-            state: childConversion.state.next(),
-            result: .link(
-                destination: reference == nil && destination.isEmpty ? nil : destination,
-                title: title.isEmpty ? nil : title,
-                parsedRange: parsedRange,
-                referenceIdentity: reference,
-                childConversion.result
-            )
-        )
-    }
-
-    private static func convertImage(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .image)
-        let parsedRange = state.range(state.node)
-        let reference = referenceIdentity(state)
-        let childConversion = convertChildren(state)
-        let source = String(cString: cmark_node_get_url(state.node))
-        let title = String(cString: cmark_node_get_title(state.node))
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(
-            state: childConversion.state.next(),
-            result: .image(
-                source: reference == nil && source.isEmpty ? nil : source,
-                title: title.isEmpty ? nil : title,
-                parsedRange: parsedRange,
-                referenceIdentity: reference, childConversion.result
-            )
-        )
-    }
-
-    private static func convertStrikethrough(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .strikethrough)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .strikethrough(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertDefinition(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        let parsedRange = state.range(state.node)
-        let children = convertChildren(state)
-        let result: RawMarkup
-        switch state.nodeType {
-        case .definitionList: result = .definitionList(parsedRange: parsedRange, children.result)
-        case .definitionTerm: result = .definitionTerm(parsedRange: parsedRange, children.result)
-        default: result = .definitionDescription(spread: cmark_node_get_definition_spread(state.node) != 0, parsedRange: parsedRange, children.result)
-        }
-        return MarkupConversion(state: children.state.next(), result: result)
-    }
-
-    private static func convertHighlight(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .highlight)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .highlight(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertTaskListItem(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .taskListItem)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        let checkbox: Checkbox = cmark_gfm_extensions_get_tasklist_item_checked(state.node) ? .checked : .unchecked
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .listItem(checkbox: checkbox, parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertTable(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .table)
-        let parsedRange = state.range(state.node)
-        let columnCount = Int(cmark_gfm_extensions_get_table_columns(state.node))
-        let columnAlignments = (0..<columnCount).map { column -> Table.ColumnAlignment? in
-            // cmark tracks left, center, and right alignments as the ASCII
-            // characters 'l', 'c', and 'r'.
-            let ascii = cmark_gfm_extensions_get_table_alignments(state.node)[column]
-            let scalar = UnicodeScalar(ascii)
-            let character = Character(scalar)
-            switch character {
-            case "l":
-                return .left
-            case "r":
-                return .right
-            case "c":
-                return .center
-            case "\0":
-                return nil
-            default:
-                fatalError("Unexpected table column character for cmark table: \(character) (0x\(String(ascii, radix: 16)))")
-            }
-        }
-
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-
-        var children = childConversion.result
-
-        let header: RawMarkup
-        if let firstChild = children.first,
-           case .tableHead = firstChild.data {
-            header = firstChild
-            children.removeFirst()
-        } else {
-            header = .tableHead(parsedRange: nil, columns: [])
-        }
-
-        if children.isEmpty {
-            precondition(childConversion.state.pendingTableBody == nil)
-        }
-
-        let body: RawMarkup
-        if !children.isEmpty {
-            let pendingBody = childConversion.state.pendingTableBody!
-            body = RawMarkup.tableBody(parsedRange: pendingBody.range, rows: children)
-        } else {
-            body = .tableBody(parsedRange: nil, rows: [])
-        }
-
-        return MarkupConversion(state: childConversion.state.next(clearPendingTableBody: true),
-                                result: .table(columnAlignments: columnAlignments,
-                                               parsedRange: parsedRange,
-                                               header: header,
-                                               body: body))
-    }
-
-    private static func convertTableHeader(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .tableHead)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .tableHead(parsedRange: parsedRange, columns: childConversion.result))
-    }
-
-    private static func convertTableRow(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .tableRow)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .tableRow(parsedRange: parsedRange, childConversion.result))
-    }
-
-    private static func convertTableCell(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .tableCell)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        let colspan = UInt(cmark_gfm_extensions_get_table_cell_colspan(state.node))
-        let rowspan = UInt(cmark_gfm_extensions_get_table_cell_rowspan(state.node))
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .tableCell(parsedRange: parsedRange, colspan: colspan, rowspan: rowspan, childConversion.result))
-    }
-
-    private static func convertInlineAttributes(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
-        precondition(state.event == CMARK_EVENT_ENTER)
-        precondition(state.nodeType == .inlineAttributes)
-        let parsedRange = state.range(state.node)
-        let childConversion = convertChildren(state)
-        let attributes = String(cString: cmark_node_get_attributes(state.node))
-        precondition(childConversion.state.node == state.node)
-        precondition(childConversion.state.event == CMARK_EVENT_EXIT)
-        return MarkupConversion(state: childConversion.state.next(), result: .inlineAttributes(attributes: attributes, parsedRange: parsedRange, childConversion.result))
-     }
 
     static func parseString(_ string: String, source: URL?, options: ParseOptions) -> Document {
         cmark_gfm_core_extensions_ensure_registered()
