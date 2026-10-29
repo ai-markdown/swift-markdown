@@ -40,6 +40,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Enable raw math syntax: inline dollar runs require at least two characters; no LaTeX preprocessing is performed.
     public static let parseMath = ParseOptions(rawValue: 1 << 11)
 
+    /// Match Web single-pass character-reference decoding in ordinary text and link fields, preserving code and TeX content.
+    public static let parseWebCharacterReferences = ParseOptions(rawValue: 1 << 14)
+
     /// Preserve actual Link/Image reference identities and Web parsing semantics; implies parseReferenceDefinitions.
     public static let parseReferenceUsages = ParseOptions(rawValue: 1 << 13)
 

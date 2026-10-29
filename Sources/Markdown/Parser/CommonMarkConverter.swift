@@ -273,13 +273,13 @@ struct MarkupParser {
             let reference = referenceIdentity(state)
             let destination = String(cString: cmark_node_get_url(state.node))
             let title = String(cString: cmark_node_get_title(state.node))
-            return .link(destination: reference == nil && destination.isEmpty ? nil : destination,
+            return .link(destination: reference == nil && !state.options.contains(.parseWebCharacterReferences) && destination.isEmpty ? nil : destination,
                          title: title.isEmpty ? nil : title, parsedRange: range, referenceIdentity: reference, children)
         case .image:
             let reference = referenceIdentity(state)
             let source = String(cString: cmark_node_get_url(state.node))
             let title = String(cString: cmark_node_get_title(state.node))
-            return .image(source: reference == nil && source.isEmpty ? nil : source,
+            return .image(source: reference == nil && !state.options.contains(.parseWebCharacterReferences) && source.isEmpty ? nil : source,
                           title: title.isEmpty ? nil : title, parsedRange: range, referenceIdentity: reference, children)
         case .table: return finishTable(state, range: range, children: children, exit: exit)
         case .tableHead: return .tableHead(parsedRange: range, columns: children)
@@ -459,6 +459,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseWebCharacterReferences) { cmarkOptions |= CMARK_OPT_WEB_CHARACTER_REFERENCES }
         if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }
         if options.contains(.parseReferenceDefinitions) { cmarkOptions |= CMARK_OPT_REFERENCE_DEFINITIONS }
         if options.contains(.parseMath) { cmarkOptions |= CMARK_OPT_MATH }
