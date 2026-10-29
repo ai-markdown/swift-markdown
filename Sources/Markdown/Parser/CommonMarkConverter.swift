@@ -238,6 +238,15 @@ struct MarkupParser {
         }
     }
 
+    /// Parser-ledger spread evidence: 0 means not captured, 1 not spread, 2 spread.
+    private static func listSpread(_ node: UnsafeMutablePointer<cmark_node>!) -> Bool? {
+        switch cmark_node_get_list_spread(node) {
+        case 1: return false
+        case 2: return true
+        default: return nil
+        }
+    }
+
     private static func finishContainer(_ frame: ConversionFrame, exit: MarkupConverterState) -> RawMarkup {
         let state = frame.state
         let range = frame.range
@@ -250,15 +259,16 @@ struct MarkupParser {
             for child in children {
                 guard case .listItem = child.data else { fatalError("Converted cmark list had a node other than RawMarkup.listItem") }
             }
+            let spread = listSpread(state.node)
             switch cmark_node_get_list_type(state.node) {
-            case CMARK_BULLET_LIST: return .unorderedList(parsedRange: range, children)
-            case CMARK_ORDERED_LIST: return .orderedList(parsedRange: range, children, startIndex: UInt(cmark_node_get_list_start(state.node)))
+            case CMARK_BULLET_LIST: return .unorderedList(parsedRange: range, children, spread: spread)
+            case CMARK_ORDERED_LIST: return .orderedList(parsedRange: range, children, startIndex: UInt(cmark_node_get_list_start(state.node)), spread: spread)
             default: fatalError("cmark reported a list node but said its list type is CMARK_NO_LIST?")
             }
-        case .item: return .listItem(checkbox: .none, parsedRange: range, children)
+        case .item: return .listItem(checkbox: .none, parsedRange: range, children, spread: listSpread(state.node))
         case .taskListItem:
             let checkbox: Checkbox = cmark_gfm_extensions_get_tasklist_item_checked(state.node) ? .checked : .unchecked
-            return .listItem(checkbox: checkbox, parsedRange: range, children)
+            return .listItem(checkbox: checkbox, parsedRange: range, children, spread: listSpread(state.node))
         case .customBlock: return .customBlock(parsedRange: range, children)
         case .paragraph: return .paragraph(parsedRange: range, children)
         case .heading: return .heading(level: Int(cmark_node_get_heading_level(state.node)), parsedRange: range, children)
@@ -468,6 +478,7 @@ struct MarkupParser {
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
         if options.contains(.parseWebCodeSyntax) { cmarkOptions |= CMARK_OPT_WEB_CODE_SYNTAX }
         if options.contains(.parseSoftBreakMetadata) { cmarkOptions |= Int32(CMARK_OPT_SOFTBREAK_METADATA) }
+        if options.contains(.parseListSpreadMetadata) { cmarkOptions |= CMARK_OPT_LIST_SPREAD_METADATA }
         if options.contains(.parseCodeMetadata) { cmarkOptions |= CMARK_OPT_CODE_METADATA }
         if options.contains(.parseWebCharacterReferences) { cmarkOptions |= CMARK_OPT_WEB_CHARACTER_REFERENCES }
         if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }
