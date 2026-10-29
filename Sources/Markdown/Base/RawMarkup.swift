@@ -88,6 +88,9 @@ public struct RawMarkupHeader {
     /// The data specific to this element.
     let data: RawMarkupData
 
+    // AIMarkdown: opaque original syntax entry, never a render identity or exact text range.
+    let sourceOriginID: UInt64?
+
     /// The number of children.
     let childCount: Int
 
@@ -111,9 +114,10 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
             }
         }
     }
-    private static func create(data: RawMarkupData, parsedRange: SourceRange?, children: [RawMarkup]) -> RawMarkup {
+    private static func create(data: RawMarkupData, parsedRange: SourceRange?, children: [RawMarkup], sourceOriginID: UInt64? = nil) -> RawMarkup {
         let buffer = self.create(minimumCapacity: children.count) { _ in
             RawMarkupHeader(data: data,
+                            sourceOriginID: sourceOriginID,
                             childCount: children.count,
                             subtreeCount: /* self */ 1 + children.subtreeCount,
                             parsedRange: parsedRange)
@@ -210,11 +214,15 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
             parsedRange = newChild.header.parsedRange
         }
 
-        return RawMarkup.create(data: header.data, parsedRange: parsedRange, children: newChildren)
+        return RawMarkup.create(data: header.data, parsedRange: parsedRange, children: newChildren, sourceOriginID: header.sourceOriginID)
     }
 
     func withChildren<Children: Collection>(_ newChildren: Children) -> RawMarkup where Children.Element == RawMarkup {
-        return .create(data: header.data, parsedRange: header.parsedRange, children: Array(newChildren))
+        return .create(data: header.data, parsedRange: header.parsedRange, children: Array(newChildren), sourceOriginID: header.sourceOriginID)
+    }
+
+    func withSourceOrigin(_ identifier: UInt64?) -> RawMarkup {
+        return .create(data: header.data, parsedRange: header.parsedRange, children: copyChildren(), sourceOriginID: identifier)
     }
 
     static func footnoteDefinition(label: String, parsedRange: SourceRange?, _ children: [RawMarkup]) -> RawMarkup {

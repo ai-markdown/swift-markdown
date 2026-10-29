@@ -378,6 +378,19 @@ extension Markup {
         return _data.indexInParent
     }
 
+    /// AIMarkdown: opaque original syntax entry carried through child rewrites.
+    /// This is neither a stable render identity nor a claim of exact character mapping.
+    public var sourceOriginID: UInt64? { _data.raw.markup.header.sourceOriginID }
+
+    /// Explicitly associates a derived node with its actual original syntax contribution.
+    /// New nodes have no origin until the transforming caller supplies one.
+    public func withSourceOrigin(_ identifier: UInt64?) -> Self {
+        if sourceOriginID == identifier { return self }
+        var result = self
+        result._data = _data.replacingSelf(_data.raw.markup.withSourceOrigin(identifier), preserveRange: true)
+        return result
+    }
+
     /// Returns `true` if this element is identical to another, comparing internal unique identifiers.
     ///
     /// - Note: Use this to bypass checking for structural equality.
