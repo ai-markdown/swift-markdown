@@ -849,6 +849,38 @@ public struct MarkupFormatter: MarkupWalker {
         print(breakString, for: thematicBreak)
     }
 
+    private func mathSequence(_ value: String) -> String {
+        var longest = 0, run = 0
+        for unit in value.utf8 {
+            if unit == 36 { run += 1; longest = max(longest, run) } else { run = 0 }
+        }
+        return String(repeating: "$", count: max(2, longest + 1))
+    }
+
+    public mutating func visitInlineMath(_ math: InlineMath) {
+        let sequence = mathSequence(math.value)
+        let units = Array(math.value.utf8)
+        let space: (UInt8) -> Bool = { $0 == 32 || $0 == 10 || $0 == 13 }
+        let data = units.contains { !space($0) }
+        let bothPadding = units.first.map(space) == true && units.last.map(space) == true
+        let dollarEdge = units.first == 36 || units.last == 36
+        let padding = data && (bothPadding || dollarEdge) ? " " : ""
+        print(sequence + padding + math.value + padding + sequence, for: math)
+    }
+
+    public mutating func visitMathBlock(_ math: MathBlock) {
+        if math.indexInParent > 0 { ensurePrecedingNewlineCount(atLeast: 2) }
+        let sequence = mathSequence(math.value)
+        print(sequence + (math.meta.map { " " + $0 } ?? ""), for: math)
+        queueNewline()
+        for (index, line) in math.value.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if index > 0 { queueNewline() }
+            print(String(line), for: math)
+        }
+        queueNewline()
+        print(sequence, for: math)
+    }
+
     public mutating func visitInlineCode(_ inlineCode: InlineCode) {
         let savedState = state
         softWrapPrint("`\(inlineCode.code)`", for: inlineCode)

@@ -232,6 +232,9 @@ public protocol MarkupVisitor<Result> {
 
     mutating func visitHighlight(_ highlight: Highlight) -> Result
 
+    mutating func visitMathBlock(_ math: MathBlock) -> Result
+    mutating func visitInlineMath(_ math: InlineMath) -> Result
+
     /**
      Visit a `Table` element and return the result.
 
@@ -415,6 +418,9 @@ extension MarkupVisitor {
     public mutating func visitStrikethrough(_ strikethrough: Strikethrough) -> Result {
         return defaultVisit(strikethrough)
     }
+
+    public mutating func visitMathBlock(_ math: MathBlock) -> Result { return defaultVisit(math) }
+    public mutating func visitInlineMath(_ math: InlineMath) -> Result { return defaultVisit(math) }
 
     public mutating func visitHighlight(_ highlight: Highlight) -> Result {
         return defaultVisit(highlight)

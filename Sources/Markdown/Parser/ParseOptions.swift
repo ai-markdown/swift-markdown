@@ -37,6 +37,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Enable Web-compatible GFM literal URL tokenization before inline delimiters.
     public static let parseWebAutolinks = ParseOptions(rawValue: 1 << 8)
 
+    /// Enable raw math syntax: inline dollar runs require at least two characters; no LaTeX preprocessing is performed.
+    public static let parseMath = ParseOptions(rawValue: 1 << 11)
+
     /// Enable block directive syntax.
     public static let parseBlockDirectives = ParseOptions(rawValue: 1 << 0)
 

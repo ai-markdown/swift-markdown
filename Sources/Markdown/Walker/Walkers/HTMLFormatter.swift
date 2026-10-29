@@ -120,6 +120,13 @@ public struct HTMLFormatter: MarkupWalker {
         }
     }
 
+    public mutating func visitInlineMath(_ math: InlineMath) {
+        result += "<code class=\"language-math math-inline\">" + escapedFootnoteText(math.value) + "</code>"
+    }
+    public mutating func visitMathBlock(_ math: MathBlock) {
+        result += "<pre><code class=\"language-math math-display\">" + escapedFootnoteText(math.value) + "</code></pre>\n"
+    }
+
     public mutating func visitCodeBlock(_ codeBlock: CodeBlock) -> () {
         let languageAttr: String
         if let language = codeBlock.language {

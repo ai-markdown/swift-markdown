@@ -41,6 +41,8 @@ fileprivate enum CommonMarkNodeType: String {
     case list
     case item
     case codeBlock = "code_block"
+    case mathBlock = "math_block"
+    case inlineMath = "math_inline"
     case htmlBlock = "html_block"
     case definitionList = "definition_list"
     case definitionTerm = "definition_term"
@@ -218,6 +220,12 @@ struct MarkupParser {
             return convertList(state)
         case .item:
             return convertListItem(state)
+        case .mathBlock:
+            let value = getLiteralContent(node: state.node)
+            let rawMeta = String(cString: cmark_node_get_fence_info(state.node))
+            return MarkupConversion(state: state.next(), result: .mathBlock(parsedRange: state.range(state.node), value: value, meta: rawMeta.isEmpty ? nil : rawMeta))
+        case .inlineMath:
+            return MarkupConversion(state: state.next(), result: .inlineMath(parsedRange: state.range(state.node), value: getLiteralContent(node: state.node)))
         case .codeBlock:
             return convertCodeBlock(state)
         case .htmlBlock:
@@ -670,6 +678,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseMath) { cmarkOptions |= CMARK_OPT_MATH }
         if options.contains(.parseWebEmphasis) {
             cmarkOptions |= CMARK_OPT_WEB_EMPHASIS
         }
