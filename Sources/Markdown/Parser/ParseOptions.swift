@@ -43,6 +43,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Capture raw code/inlineCode fields without changing existing display text; programmatic nodes have no such metadata.
     public static let parseCodeMetadata = ParseOptions(rawValue: 1 << 15)
 
+    /// Accept Web code delimiter lengths without the legacy 80/255 limits.
+    public static let parseWebCodeSyntax = ParseOptions(rawValue: 1 << 16)
+
     /// Match Web single-pass character-reference decoding in ordinary text and link fields, preserving code and TeX content.
     public static let parseWebCharacterReferences = ParseOptions(rawValue: 1 << 14)
 

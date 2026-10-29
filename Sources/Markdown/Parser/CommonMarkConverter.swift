@@ -459,6 +459,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseWebCodeSyntax) { cmarkOptions |= CMARK_OPT_WEB_CODE_SYNTAX }
         if options.contains(.parseCodeMetadata) { cmarkOptions |= CMARK_OPT_CODE_METADATA }
         if options.contains(.parseWebCharacterReferences) { cmarkOptions |= CMARK_OPT_WEB_CHARACTER_REFERENCES }
         if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }
