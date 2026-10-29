@@ -653,6 +653,9 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseWebEmphasis) {
+            cmarkOptions |= CMARK_OPT_WEB_EMPHASIS
+        }
         if options.contains(.parseFootnotes) {
             cmarkOptions |= CMARK_OPT_FOOTNOTES | CMARK_OPT_FOOTNOTES_LOSSLESS
         }

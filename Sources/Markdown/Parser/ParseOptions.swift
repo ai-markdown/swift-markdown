@@ -28,6 +28,9 @@ public struct ParseOptions: OptionSet, Sendable {
     /// Disable the default table, strikethrough and task list extensions.
     public static let disableGFM = ParseOptions(rawValue: 1 << 7)
 
+    /// Observe raw adjacent characters for Web-compatible emphasis boundaries.
+    public static let parseWebEmphasis = ParseOptions(rawValue: 1 << 9)
+
     /// Enable Web-compatible GFM literal URL tokenization before inline delimiters.
     public static let parseWebAutolinks = ParseOptions(rawValue: 1 << 8)
 
