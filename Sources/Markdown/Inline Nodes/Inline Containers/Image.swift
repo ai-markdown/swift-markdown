@@ -55,13 +55,13 @@ public extension Image {
     /// The image's source.
     var source: String? {
       get {
-        guard case let .image(source, _) = _data.raw.markup.data else {
+        guard case let .image(source, _, _) = _data.raw.markup.data else {
             fatalError("\(self) markup wrapped unexpected \(_data.raw)")
         }
         return source
       }
       set {
-        guard newValue != source else {
+        guard newValue != source || referenceIdentity != nil else {
             return
         }
         if let s = newValue, s.isEmpty {
@@ -75,13 +75,13 @@ public extension Image {
     /// The image's title.
     var title: String? {
       get {
-        guard case let .image(_, title) = _data.raw.markup.data else {
+        guard case let .image(_, title, _) = _data.raw.markup.data else {
             fatalError("\(self) markup wrapped unexpected \(_data.raw)")
         }
         return title
       }
       set {
-        guard newValue != title else {
+        guard newValue != title || referenceIdentity != nil else {
             return
         }
 
@@ -91,6 +91,13 @@ public extension Image {
             _data = _data.replacingSelf(.image(source: source, title: newValue, parsedRange: nil, _data.raw.markup.copyChildren()))
         }
       }
+    }
+
+    /// Only parsed reference syntax has an identity; direct links and programmatically created nodes have nil.
+    /// Setting the destination or title clears the identity; changing children/sourceOrigin preserves it.
+    var referenceIdentity: ReferenceIdentity? {
+        guard case let .image(_, _, identity) = _data.raw.markup.data else { preconditionFailure("Expected a reference container node") }
+        return identity
     }
 
     // MARK: Visitation

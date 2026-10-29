@@ -190,7 +190,8 @@ struct MarkupTreeDumper: MarkupWalker {
     }
 
     mutating func visitLink(_ link: Link) {
-        dump(link, customDescription: link.destination.map { "destination: \"\($0)\"" } ?? "")
+        let identity = link.referenceIdentity.map { "reference: \($0.referenceType.rawValue) \($0.identifier.debugDescription) " } ?? ""
+        dump(link, customDescription: identity + (link.destination.map { "destination: \"\($0)\"" } ?? ""))
     }
 
     mutating func visitImage(_ image: Image) {
@@ -198,6 +199,7 @@ struct MarkupTreeDumper: MarkupWalker {
         if let title = image.title {
             description += " title: \"\(title)\""
         }
+        if let reference = image.referenceIdentity { description += " reference: \(reference.referenceType.rawValue) \(reference.identifier.debugDescription)" }
         dump(image, customDescription: description)
     }
 

@@ -113,6 +113,7 @@ fileprivate extension Table.Cell {
 
 /// Prints a `Markup` tree with formatting options.
 public struct MarkupFormatter: MarkupWalker {
+    private var referenceLabelDepth = 0
     /**
      Formatting options for Markdown, based on [CommonMark](https://commonmark.org).
      */
@@ -918,6 +919,12 @@ public struct MarkupFormatter: MarkupWalker {
     }
 
     public mutating func visitImage(_ image: Image) {
+        if let reference = image.referenceIdentity {
+            print("![", for: image); referenceLabelDepth += 1; descendInto(image); referenceLabelDepth -= 1
+            print("][\(reference.labelSource.replacingOccurrences(of: "\t", with: " "))]", for: image)
+            return
+        }
+
         let savedState = state
         func printImage() {
             print("![", for: image)
@@ -952,6 +959,12 @@ public struct MarkupFormatter: MarkupWalker {
     }
 
     public mutating func visitLink(_ link: Link) {
+        if let reference = link.referenceIdentity {
+            print("[", for: link); referenceLabelDepth += 1; descendInto(link); referenceLabelDepth -= 1
+            print("][\(reference.labelSource.replacingOccurrences(of: "\t", with: " "))]", for: link)
+            return
+        }
+
         let savedState = state
         if formattingOptions.condenseAutolinks,
            link.isAutolink,
@@ -996,7 +1009,15 @@ public struct MarkupFormatter: MarkupWalker {
         // any special Markdown syntax or punctuation.
         // We can do this because the model differentiates between real Text
         // content and string-like data, such as URLs.
-        softWrapPrint(text.string, for: text)
+        if referenceLabelDepth > 0 {
+            let punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+            var escaped = ""
+            for scalar in text.string.unicodeScalars {
+                if punctuation.unicodeScalars.contains(scalar) { escaped.append("\\") }
+                escaped.unicodeScalars.append(scalar)
+            }
+            softWrapPrint(escaped, for: text)
+        } else { softWrapPrint(text.string, for: text) }
     }
 
     public mutating func visitStrikethrough(_ strikethrough: Strikethrough) {

@@ -55,7 +55,7 @@ public extension Link {
     /// The link's destination.
     var destination: String? {
         get {
-            guard case let .link(destination, _) = _data.raw.markup.data else {
+            guard case let .link(destination, _, _) = _data.raw.markup.data else {
                 fatalError("\(self) markup wrapped unexpected \(_data.raw)")
             }
             return destination
@@ -72,7 +72,7 @@ public extension Link {
     /// The link's title.
     var title: String? {
         get {
-            guard case let .link(_, title) = _data.raw.markup.data else {
+            guard case let .link(_, title, _) = _data.raw.markup.data else {
                 fatalError("\(self) markup wrapped unexpected \(_data.raw)")
             }
             return title
@@ -87,13 +87,21 @@ public extension Link {
     }
 
     var isAutolink: Bool {
-        guard let destination = destination,
+        guard referenceIdentity == nil,
+              let destination = destination,
               childCount == 1,
               let text = child(at: 0) as? Text,
               destination == text.string else {
             return false
         }
         return true
+    }
+
+    /// Only parsed reference syntax has an identity; direct links and programmatically created nodes have nil.
+    /// Setting the destination or title clears the identity; changing children/sourceOrigin preserves it.
+    var referenceIdentity: ReferenceIdentity? {
+        guard case let .link(_, _, identity) = _data.raw.markup.data else { preconditionFailure("Expected a reference container node") }
+        return identity
     }
 
     // MARK: Visitation

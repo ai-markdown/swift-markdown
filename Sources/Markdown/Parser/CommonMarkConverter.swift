@@ -318,17 +318,9 @@ struct MarkupParser {
 
     // mdast-util-from-markdown: normalizeIdentifier(rawLabel).toLowerCase().
     private static func referenceIdentifier(_ text: String) -> String {
-        var result = "", pending = false
-        for scalar in text.unicodeScalars {
-            if scalar.value == 9 || scalar.value == 10 || scalar.value == 13 || scalar.value == 32 {
-                pending = !result.isEmpty
-            } else {
-                if pending { result.append(" ") }
-                result.unicodeScalars.append(scalar)
-                pending = false
-            }
-        }
-        return result.lowercased().uppercased().lowercased()
+        guard let identifier = aimarkdown_cmark_reference_identifier(text) else { return "" }
+        defer { aimarkdown_cmark_reference_identifier_free(identifier) }
+        return String(cString: identifier)
     }
 
     private static func convertDocument(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -513,10 +505,20 @@ struct MarkupParser {
         return MarkupConversion(state: childConversion.state.next(), result: .strong(parsedRange: parsedRange, childConversion.result))
     }
 
+    private static func referenceIdentity(_ state: MarkupConverterState) -> ReferenceIdentity? {
+        let kind = aimarkdown_cmark_node_get_reference_usage_type(state.node)
+        guard kind != 0 else { return nil }
+        let source = String(cString: aimarkdown_cmark_node_get_reference_usage_source(state.node))
+        let label = String(cString: aimarkdown_cmark_node_get_reference_usage_label(state.node))
+        let type: ReferenceIdentity.ReferenceType = kind == 3 ? .full : kind == 2 ? .collapsed : .shortcut
+        return ReferenceIdentity(identifier: referenceIdentifier(source), label: label, referenceType: type, labelSource: source)
+    }
+
     private static func convertLink(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
         precondition(state.event == CMARK_EVENT_ENTER)
         precondition(state.nodeType == .link)
         let parsedRange = state.range(state.node)
+        let reference = referenceIdentity(state)
         let childConversion = convertChildren(state)
         let destination = String(cString: cmark_node_get_url(state.node))
         let title = String(cString: cmark_node_get_title(state.node))
@@ -525,9 +527,10 @@ struct MarkupParser {
         return MarkupConversion(
             state: childConversion.state.next(),
             result: .link(
-                destination: destination.isEmpty ? nil : destination,
+                destination: reference == nil && destination.isEmpty ? nil : destination,
                 title: title.isEmpty ? nil : title,
                 parsedRange: parsedRange,
+                referenceIdentity: reference,
                 childConversion.result
             )
         )
@@ -537,6 +540,7 @@ struct MarkupParser {
         precondition(state.event == CMARK_EVENT_ENTER)
         precondition(state.nodeType == .image)
         let parsedRange = state.range(state.node)
+        let reference = referenceIdentity(state)
         let childConversion = convertChildren(state)
         let source = String(cString: cmark_node_get_url(state.node))
         let title = String(cString: cmark_node_get_title(state.node))
@@ -545,9 +549,10 @@ struct MarkupParser {
         return MarkupConversion(
             state: childConversion.state.next(),
             result: .image(
-                source: source.isEmpty ? nil : source,
+                source: reference == nil && source.isEmpty ? nil : source,
                 title: title.isEmpty ? nil : title,
-                parsedRange: parsedRange, childConversion.result
+                parsedRange: parsedRange,
+                referenceIdentity: reference, childConversion.result
             )
         )
     }
@@ -701,6 +706,7 @@ struct MarkupParser {
         cmark_gfm_core_extensions_ensure_registered()
 
         var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        if options.contains(.parseReferenceUsages) { cmarkOptions |= AIMARKDOWN_CMARK_OPT_REFERENCE_USAGES }
         if options.contains(.parseReferenceDefinitions) { cmarkOptions |= CMARK_OPT_REFERENCE_DEFINITIONS }
         if options.contains(.parseMath) { cmarkOptions |= CMARK_OPT_MATH }
         if options.contains(.parseWebEmphasis) {
