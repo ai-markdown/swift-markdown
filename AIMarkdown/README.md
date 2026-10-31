@@ -7,3 +7,5 @@ The upstream baseline is `25cb61d3482054b09ae76ca4f281b1bfe7fe5a43`. This reposi
 Original implementation provenance, patch paths, and checksums are recorded in `provenance.json`. Third-party licenses are bundled in `ThirdPartyLicenses`; upstream license files remain unchanged. Source paths in the provenance record refer to the pinned `ai-markdown-swift` source repository, not to files in this fork.
 
 `ParseOptions.parseWebTables` preserves actual body-cell counts and uses Web GFM escape boundaries, including unfinished pipe-only rows. Header alignments keep delimiter-row width even when a body row is wider. Ordinary parsing and programmatic table construction retain their existing behavior; display handlers can pad or truncate to the header width.
+
+`ParseOptions.parseWebHTMLBlocks` opts into Web HTML declaration starts (including lowercase ASCII declaration names) and HTML block flow on lazy lines of document containers. It preserves the legacy parser profile when absent and can be combined with opt-in Web source-event positions.
