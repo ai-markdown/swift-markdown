@@ -92,5 +92,17 @@
       "patch": "scripts/softbreak-metadata-probe/swift-softbreak-metadata.patch",
       "sha256": "5152f46ecc69faa65607e9600e5102e89ed87287ceea9193db0eaa5dd2a86737"
     }
+  ],
+  "testSources": [
+    {
+      "file": "Sources/Markdown/Parser/ParseOptions.swift:parseWebTables",
+      "sourceRepository": "https://github.com/ai-markdown/ai-markdown.git",
+      "sourceRevision": "e9ec1799fdc380d99ce0a6313023515895bbd7bf",
+      "sourceFiles": [
+        "packages/engine/package.json"
+      ],
+      "description": "Opt-in bridge for actual GFM table rows and header alignment width, checked against the pinned Web raw MDAST and table handlers.",
+      "license": "MIT; AIMarkdown/ThirdPartyLicenses/ai-markdown/LICENSE-ai-markdown"
+    }
   ]
 }

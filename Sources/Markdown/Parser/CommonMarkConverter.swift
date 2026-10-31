@@ -346,7 +346,7 @@ struct MarkupParser {
             guard let pending = exit.pendingTableBody else { preconditionFailure("Table body is missing its actual iterator state") }
             body = .tableBody(parsedRange: pending.range, rows: rows)
         }
-        return .table(columnAlignments: alignments, parsedRange: range, header: header, body: body)
+        return .table(columnAlignments: alignments, parsedRange: range, header: header, body: body, preserveHeaderWidth: state.options.contains(.parseWebTables))
     }
 
     private static func convertLeaf(_ state: MarkupConverterState) -> MarkupConversion<RawMarkup> {
@@ -491,7 +491,8 @@ struct MarkupParser {
     static func parseString(_ string: String, source: URL?, options: ParseOptions) -> Document {
         cmark_gfm_core_extensions_ensure_registered()
 
-        var cmarkOptions = CMARK_OPT_TABLE_SPANS
+        // Web GFM retains empty cells instead of interpreting colspan/rowspan markers.
+        var cmarkOptions = options.contains(.parseWebTables) ? CMARK_OPT_WEB_TABLES : CMARK_OPT_TABLE_SPANS
         if options.contains(.parseWebCodeSyntax) { cmarkOptions |= CMARK_OPT_WEB_CODE_SYNTAX }
         if options.contains(.parseSoftBreakMetadata) { cmarkOptions |= Int32(CMARK_OPT_SOFTBREAK_METADATA) }
         if options.contains(.parseListSpreadMetadata) { cmarkOptions |= CMARK_OPT_LIST_SPREAD_METADATA }
