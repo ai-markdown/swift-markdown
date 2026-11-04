@@ -93,7 +93,7 @@ public struct RawMarkupHeader {
     let sourceOriginID: UInt64?
 
     /// The number of children.
-    let childCount: Int
+    var childCount: Int
 
     /// The number of elements in this subtree, including this one.
     let subtreeCount: Int
@@ -187,9 +187,25 @@ final class RawMarkup: ManagedBuffer<RawMarkupHeader, RawMarkup> {
         })
     }
 
+    // AIMarkdown: release descendants with an explicit worklist. Recursive element
+    // deinitialization needs one stack frame per nesting level, so a deeply nested
+    // document (for example thousands of `>` markers) overflows small thread stacks
+    // while the tree is being freed. Uniquely referenced children hand their own
+    // children to the worklist before release; shared subtrees are released normally
+    // by their last owner.
     deinit {
-        return self.withUnsafeMutablePointerToElements {
-            $0.deinitialize(count: header.childCount)
+        var pending = self.withUnsafeMutablePointerToElements { elements in
+            (0..<header.childCount).map { (elements + $0).move() }
+        }
+        while var node = pending.popLast() {
+            guard isKnownUniquelyReferenced(&node) else { continue }
+            let count = node.header.childCount
+            node.withUnsafeMutablePointerToElements { elements in
+                for index in 0..<count {
+                    pending.append((elements + index).move())
+                }
+            }
+            node.header.childCount = 0
         }
     }
 
